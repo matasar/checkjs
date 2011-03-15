@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 var parser = require("./parse-js");
 var fs = require("fs");
 
@@ -53,7 +51,6 @@ var FunctionNode = function (array) {
 
 var ReturnNode = function (array) {
   var self = new Node("return");
-
   var rest = array.slice(1)[0];
 
   self.body = buildBody(rest);
@@ -64,12 +61,12 @@ var ReturnNode = function (array) {
 var VarNode = function (array) {
   var self = new Node("var");
 
-  self.assigns = array.slice(1).map(function (ea) { new AssignmentNode(ea) });
+  self.assigns = array.slice(1).map(function (ea) { new VarAssignmentNode(ea) });
 
   return self;
 };
 
-var AssignmentNode = function (array) {
+var VarAssignmentNode = function (array) {
   var self = new Node("assignment");
 
   self.name = array[0][0];
@@ -216,7 +213,7 @@ var DotNode = function(array) {
 var TryNode = function(array) {
   var self = new Node("try");
 
-  self.body = array[1].map(buildBody);
+  self.body = new NodeCollection(array[1] || []);
   self.exception = buildBody(array[2]);
   self.finally = new NodeCollection(array[3] || []);
   return self;
