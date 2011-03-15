@@ -12,38 +12,48 @@ function buildBody(ea) {
   var constructor = nodeMap[ea[0]];
   if (typeof constructor === 'undefined') {
     console.log(ea);
-    console.log(ea[0]);
     throw "Can't find: " + ea[0];
   }
   return new constructor(ea);
 };
 
-var TopLevelNode = function (array) {
+var Node = function(name) {
   var self = this;
+  self.nodeName = name;
+  return self;
+};
+
+var NodeCollection = function (array) {
+  var self = new Node("nodes");
+
+  self.nodes = array.map(buildBody);
+
+  return self;
+};
+
+var TopLevelNode = function (array) {
+  var self = new Node("toplevel");
   var rest = array.slice(1);
 
-  self.nodeName = "TopLevel";
-  self.nodes = rest[0].map(buildBody);
+  self.nodes = new NodeCollection(rest[0]);
 
   return self;
 };
 
 var FunctionNode = function (array) {
-  var self = this;
+  var self = new Node("function");
 
-  self.nodeName = "function";
   self.fn = array[1];
   self.arguments = array[2];
-  var rest = array.slice(3);
-  self.body = rest[0].map(buildBody);
 
+  self.body = new NodeCollection(array.slice(3)[0]);
 
   return self;
 };
 
 var ReturnNode = function (array) {
-  var self = this;
-  self.nodeName = "return";
+  var self = new Node("return");
+
   var rest = array.slice(1)[0];
 
   self.body = buildBody(rest);
@@ -52,17 +62,16 @@ var ReturnNode = function (array) {
 }
 
 var VarNode = function (array) {
-  var self = this;
+  var self = new Node("var");
 
-  self.nodeName = "var";
   self.assigns = array.slice(1).map(function (ea) { new AssignmentNode(ea) });
 
   return self;
 };
 
 var AssignmentNode = function (array) {
-  var self = this;
-  self.nodeName = "assignment";
+  var self = new Node("assignment");
+
   self.name = array[0][0];
 
   if (array[0][1]) {
@@ -74,9 +83,7 @@ var AssignmentNode = function (array) {
 };
 
 var StatNode = function (array) {
-  var self = this;
-
-  self.nodeName = "stat";
+  var self = new Node("stat");
 
   self.body = buildBody(array[1]);
 
@@ -84,7 +91,7 @@ var StatNode = function (array) {
 };
 
 var ValueNode = function (array) {
-  var self = this;
+  var self = new Node("value");
 
   self.type = array[0];
   self.value = array[1];
@@ -93,8 +100,7 @@ var ValueNode = function (array) {
 };
 
 var BinaryNode = function (array) {
-  var self = this;
-  self.nodeName = "binary";
+  var self = new Node("binary");
 
   self.operator = array[1];
   self.lhs = buildBody(array[2]);
@@ -104,28 +110,24 @@ var BinaryNode = function (array) {
 };
 
 var ArrayNode = function (array) {
-  var self = this;
-  self.nodeName = "array";
+  var self = new Node("array");
 
-  self.elements = array[1].map(buildBody);
+  self.elements = new NodeCollection(array[1]);
 
   return self;
 };
 
 var CallNode = function (array) {
-  var self = this;
+  var self = new Node("call");
 
-  self.nodeName = "call";
   self.callee = buildBody(array[1]);
-  self.arguments = array[2].map(buildBody);
+  self.arguments = new NodeCollection(array[2]);
 
   return self;
 }
 
 var RegexNode = function (array) {
-  var self = this;
-
-  self.nodeName = "regex";
+  var self = new Node("regex");
 
   self.string = array[1];
   self.modifiers = array[2];
@@ -134,8 +136,7 @@ var RegexNode = function (array) {
 };
 
 var ObjectNode = function (array) {
-  var self = this;
-  self.nodeName = "object";
+  var self = new Node("object");
 
   self.nodes = array[1].map(function (ea) { new KeyValueNode(ea); });
 
@@ -143,7 +144,8 @@ var ObjectNode = function (array) {
 };
 
 var KeyValueNode = function(array) {
-  var self = this;
+  var self = new Node("keyValue");
+
   self.key = array[0];
   self.value = buildBody(array[1]);
 
@@ -151,16 +153,15 @@ var KeyValueNode = function(array) {
 };
 
 var BlockNode = function(array) {
-  var self = this;
-  self.nodeName = "block";
-  self.body = (array[1] || []).map(buildBody);
+  var self = new Node("block");
+
+  self.body = new NodeCollection(array[1] || []);
 
   return self;
 };
 
 var IfNode = function(array) {
-  var self = this;
-  self.nodeName = "if";
+  var self = new Node("if");
 
   self.condition = buildBody(array[1]);
   self.body = buildBody(array[2]);
@@ -168,46 +169,44 @@ var IfNode = function(array) {
 };
 
 var AssignNode = function(array) {
-  var self = this;
-  self.nodeName = "assign";
+  var self = new Node("assign");
 
   self.operator = array[1];
   self.name = buildBody(array[2]);
   self.value = buildBody(array[3]);
+
   return self;
 };
 
-var UnaryPostfixNode = function(array) {
-  var self = this;
-  self.nodeName = "unary postfix";
+var UnaryNode = function(name, array) {
+  var self = new Node(name);
 
   self.operator = array[1];
   self.name = buildBody(array[2]);
+
   return self;
+}
+
+var UnaryPostfixNode = function(array) {
+  return new UnaryNode("postfix", array);
 };
 
 var UnaryPrefixNode = function(array) {
-  var self = this;
-  self.nodeName = "unary postfix";
-
-  self.operator = array[1];
-  self.name = buildBody(array[2]);
-
-  return self;
+  return new UnaryNode("prefix", array);
 };
 
 var NewNode = function(array) {
-  var self = this;
-  self.nodeName = "new";
+  var self = new Node("new");
+
   self.fn = buildBody(array[1]);
-  self.arguments = array[2].map(buildBody);
+  self.arguments = new NodeCollection(array[2]);
 
   return self;
 };
 
 var DotNode = function(array) {
-  var self = this;
-  self.nodeName = array[0];
+  var self = new Node(array[0]);
+
   self.body = buildBody(array[1]);
   self.accessor = array[2];
 
@@ -215,35 +214,33 @@ var DotNode = function(array) {
 };
 
 var TryNode = function(array) {
-  var self = this;
-  self.nodeName = "try";
+  var self = new Node("try");
+
   self.body = array[1].map(buildBody);
   self.exception = buildBody(array[2]);
-  self.finally = (array[3] || []).map(buildBody);
+  self.finally = new NodeCollection(array[3] || []);
   return self;
 };
 
 var ExceptionNode = function(array) {
-  var self = this;
-  self.nodeName = "exception";
-  self.block = array[1].map(buildBody);
+  var self = new Node("exception");
+
+  self.block = new NodeCollection(array[1]);
 
   return self;
 };
 
 var ThrowNode = function(array) {
-  var self = this;
+  var self = new Node("throw");
 
-  self.nodeName = "throw";
   self.body = buildBody(array[1]);
 
   return self;
 };
 
 var WhileNode = function(array) {
-  var self = this;
+  var self = new Node("while");
 
-  self.nodeName = "while";
   self.condition = buildBody(array[1]);
   self.body = buildBody(array[2]);
 
@@ -251,8 +248,7 @@ var WhileNode = function(array) {
 };
 
 var SwitchNode = function(array) {
-  var self = this;
-  self.nodeName = "switch";
+  var self = new Node("switch");
 
   self.value = buildBody(array[1]);
   self.cases = array[2].map(function (ea) { return new CaseNode(ea); });
@@ -260,21 +256,20 @@ var SwitchNode = function(array) {
 };
 
 var CaseNode = function(array) {
-  var self = this;
-  self.nodeName = "case";
+  var self = new Node("case");
+
   if (array[0]) {
     self.value = buildBody(array[0]);
   } else {
     self.value = "default";
   }
-  self.body = array[1].map(buildBody);
+  self.body = new NodeCollection(array[1]);
 
   return self;
 };
 
 var ForNode = function(array) {
-  var self = this;
-  self.nodeName = "for";
+  var self = new Node("for");
 
   self.initializer = buildBody(array[1]);
   self.condition = buildBody(array[2]);
@@ -285,17 +280,16 @@ var ForNode = function(array) {
 };
 
 var SequenceNode = function(array) {
-  var self = this;
+  var self = new Node("sequence");
 
   self.nodeName = "sequence";
-  self.body = array.slice(1).map(buildBody);
+  self.body = new NodeCollection(array.slice(1));
 
   return self;
 };
 
 var TernaryNode = function(array) {
-  var self = this;
-  self.nodeName = "ternary";
+  var self = new Node("ternary");
 
   self.condition = buildBody(array[1]);
   self.ifTrue = buildBody(array[2]);
@@ -305,8 +299,8 @@ var TernaryNode = function(array) {
 };
 
 var BreakNode = function(array) {
-  var self = this;
-  self.nodeName = "break";
+  var self = new Node("break");
+
   self.body = buildBody(array[1]);
 
   return self;
