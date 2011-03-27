@@ -17,58 +17,89 @@ function buildBody(ea) {
 
 var Node = function(name) {
   var self = this;
+
   self.nodeName = name;
+
+  self.accept = function (visitor) {
+    visitor['visit' + self.nodeName](self);
+  };
+
   return self;
 };
 
 var NodeCollection = function (array) {
-  var self = new Node("nodes");
+  var self = new Node("Nodes");
 
   self.nodes = array.map(buildBody);
+
+  self.accept = function (visitor) {
+    self.nodes.forEach(function (ea) {
+      ea.accept(visitor);
+    });
+  };
 
   return self;
 };
 
 var TopLevelNode = function (array) {
-  var self = new Node("toplevel");
+  var self = new Node("TopLevel");
   var rest = array.slice(1);
 
   self.nodes = new NodeCollection(rest[0]);
+
+  self.accept = function (visitor) {
+    visitor.visitTopLevel(self);
+    self.nodes.accept(visitor);
+  };
 
   return self;
 };
 
 var FunctionNode = function (array) {
-  var self = new Node("function");
+  var self = new Node("Function");
 
   self.fn = array[1];
   self.arguments = array[2];
 
   self.body = new NodeCollection(array.slice(3)[0]);
 
+  self.accept = function (visitor) {
+    visitor.visitFunction(self);
+    self.body.accept(visitor);
+  };
+
   return self;
 };
 
 var ReturnNode = function (array) {
-  var self = new Node("return");
+  var self = new Node("Return");
   var rest = array.slice(1)[0];
 
   self.body = buildBody(rest);
+
+  self.accept = function (visitor) {
+    visitor.visitReturn(self);
+    self.body.accept(visitor);
+  };
 
   return self;
 }
 
 var VarNode = function (array) {
-  var self = new Node("var");
+  var self = new Node("Var");
 
-  self.assigns = array.slice(1).map(function (ea) { new VarAssignmentNode(ea) });
+  self.assigns = array.slice(1).map(function (ea) { return new VarAssignmentNode(ea); });
 
+  self.accept = function (visitor) {
+    self.assigns.forEach(function (ea) {
+      ea.accept(visitor);
+    });
+  };
   return self;
 };
 
 var VarAssignmentNode = function (array) {
-  var self = new Node("assignment");
-
+  var self = new Node("VarAssignment");
   self.name = array[0][0];
 
   if (array[0][1]) {
@@ -76,11 +107,13 @@ var VarAssignmentNode = function (array) {
   } else {
     self.body = [];
   }
+
+  console.log(self);
   return self;
 };
 
 var StatNode = function (array) {
-  var self = new Node("stat");
+  var self = new Node("Stat");
 
   self.body = buildBody(array[1]);
 
@@ -88,7 +121,7 @@ var StatNode = function (array) {
 };
 
 var ValueNode = function (array) {
-  var self = new Node("value");
+  var self = new Node("Value");
 
   self.type = array[0];
   self.value = array[1];
@@ -97,7 +130,7 @@ var ValueNode = function (array) {
 };
 
 var BinaryNode = function (array) {
-  var self = new Node("binary");
+  var self = new Node("Binary");
 
   self.operator = array[1];
   self.lhs = buildBody(array[2]);
@@ -107,7 +140,7 @@ var BinaryNode = function (array) {
 };
 
 var ArrayNode = function (array) {
-  var self = new Node("array");
+  var self = new Node("Array");
 
   self.elements = new NodeCollection(array[1]);
 
@@ -115,7 +148,7 @@ var ArrayNode = function (array) {
 };
 
 var CallNode = function (array) {
-  var self = new Node("call");
+  var self = new Node("Call");
 
   self.callee = buildBody(array[1]);
   self.arguments = new NodeCollection(array[2]);
@@ -124,7 +157,7 @@ var CallNode = function (array) {
 }
 
 var RegexNode = function (array) {
-  var self = new Node("regex");
+  var self = new Node("Regex");
 
   self.string = array[1];
   self.modifiers = array[2];
@@ -133,7 +166,7 @@ var RegexNode = function (array) {
 };
 
 var ObjectNode = function (array) {
-  var self = new Node("object");
+  var self = new Node("Object");
 
   self.nodes = array[1].map(function (ea) { new KeyValueNode(ea); });
 
@@ -141,7 +174,7 @@ var ObjectNode = function (array) {
 };
 
 var KeyValueNode = function(array) {
-  var self = new Node("keyValue");
+  var self = new Node("KeyValue");
 
   self.key = array[0];
   self.value = buildBody(array[1]);
@@ -150,15 +183,14 @@ var KeyValueNode = function(array) {
 };
 
 var BlockNode = function(array) {
-  var self = new Node("block");
-
+  var self = new Node("Block");
   self.body = new NodeCollection(array[1] || []);
 
   return self;
 };
 
 var IfNode = function(array) {
-  var self = new Node("if");
+  var self = new Node("If");
 
   self.condition = buildBody(array[1]);
   self.body = buildBody(array[2]);
@@ -166,7 +198,7 @@ var IfNode = function(array) {
 };
 
 var AssignNode = function(array) {
-  var self = new Node("assign");
+  var self = new Node("Assign");
 
   self.operator = array[1];
   self.name = buildBody(array[2]);
@@ -182,18 +214,18 @@ var UnaryNode = function(name, array) {
   self.name = buildBody(array[2]);
 
   return self;
-}
+};
 
 var UnaryPostfixNode = function(array) {
-  return new UnaryNode("postfix", array);
+  return new UnaryNode("Postfix", array);
 };
 
 var UnaryPrefixNode = function(array) {
-  return new UnaryNode("prefix", array);
+  return new UnaryNode("Prefix", array);
 };
 
 var NewNode = function(array) {
-  var self = new Node("new");
+  var self = new Node("New");
 
   self.fn = buildBody(array[1]);
   self.arguments = new NodeCollection(array[2]);
@@ -202,7 +234,7 @@ var NewNode = function(array) {
 };
 
 var DotNode = function(array) {
-  var self = new Node(array[0]);
+  var self = new Node(array[0].charAt(0).toUpperCase() + array[0].slice(1));
 
   self.body = buildBody(array[1]);
   self.accessor = array[2];
@@ -211,7 +243,7 @@ var DotNode = function(array) {
 };
 
 var TryNode = function(array) {
-  var self = new Node("try");
+  var self = new Node("Try");
 
   self.body = new NodeCollection(array[1] || []);
   self.exception = buildBody(array[2]);
@@ -220,7 +252,7 @@ var TryNode = function(array) {
 };
 
 var ExceptionNode = function(array) {
-  var self = new Node("exception");
+  var self = new Node("Exception");
 
   self.block = new NodeCollection(array[1]);
 
@@ -228,7 +260,7 @@ var ExceptionNode = function(array) {
 };
 
 var ThrowNode = function(array) {
-  var self = new Node("throw");
+  var self = new Node("Throw");
 
   self.body = buildBody(array[1]);
 
@@ -236,7 +268,7 @@ var ThrowNode = function(array) {
 };
 
 var WhileNode = function(array) {
-  var self = new Node("while");
+  var self = new Node("While");
 
   self.condition = buildBody(array[1]);
   self.body = buildBody(array[2]);
@@ -245,7 +277,7 @@ var WhileNode = function(array) {
 };
 
 var SwitchNode = function(array) {
-  var self = new Node("switch");
+  var self = new Node("Switch");
 
   self.value = buildBody(array[1]);
   self.cases = array[2].map(function (ea) { return new CaseNode(ea); });
@@ -253,7 +285,7 @@ var SwitchNode = function(array) {
 };
 
 var CaseNode = function(array) {
-  var self = new Node("case");
+  var self = new Node("Case");
 
   if (array[0]) {
     self.value = buildBody(array[0]);
@@ -266,7 +298,7 @@ var CaseNode = function(array) {
 };
 
 var ForNode = function(array) {
-  var self = new Node("for");
+  var self = new Node("For");
 
   self.initializer = buildBody(array[1]);
   self.condition = buildBody(array[2]);
@@ -277,16 +309,15 @@ var ForNode = function(array) {
 };
 
 var SequenceNode = function(array) {
-  var self = new Node("sequence");
+  var self = new Node("Sequence");
 
-  self.nodeName = "sequence";
   self.body = new NodeCollection(array.slice(1));
 
   return self;
 };
 
 var TernaryNode = function(array) {
-  var self = new Node("ternary");
+  var self = new Node("Ternary");
 
   self.condition = buildBody(array[1]);
   self.ifTrue = buildBody(array[2]);
@@ -296,7 +327,7 @@ var TernaryNode = function(array) {
 };
 
 var BreakNode = function(array) {
-  var self = new Node("break");
+  var self = new Node("Break");
 
   self.body = buildBody(array[1]);
 
@@ -340,11 +371,41 @@ var nodeMap = {
 function buildNodes(data) {
   var ast = parser.parse(data);
   var constructor = nodeMap[ast[0]];
-  return new constructor(ast);
+  return new constructor(ast, ast);
 };
+
+var Visitor = function () {
+  var self = {};
+
+  var nothing = function (node) {};
+
+  self.visitTopLevel = nothing;
+  self.visitNodes = nothing;
+  self.visitStat = nothing;
+  self.visitFunction = nothing;
+  self.visitVar = nothing;
+  self.visitIf = nothing;
+  self.visitBlock = nothing;
+  self.visitReturn = nothing;
+  self.visitTry = nothing;
+  self.visitThrow = nothing;
+  self.visitWhile = nothing;
+  self.visitSwitch = nothing;
+  self.visitFor = nothing;
+  self.visitCall = nothing;
+  self.visitBinary = nothing;
+  self.visitValue = nothing;
+  self.visitPrefix = nothing;
+  self.visitTernary = nothing;
+  self.visitDot = nothing;
+  self.visitVarAssignment = nothing;
+
+  return self;
+}
 
 files.forEach(function (file) {
     fs.readFile(file, 'utf-8', function(err, data) {
-      console.log(buildNodes(data));
+      var nodes = buildNodes(data);
+      nodes.accept(new Visitor());
     });
 });
